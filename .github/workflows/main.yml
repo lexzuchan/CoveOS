@@ -1,0 +1,36 @@
+name: Build Cove ISO
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: [self-hosted, Windows, X64, cove-iso]
+    timeout-minutes: 90
+    env:
+      COVE_BASE_ISO: ${{ vars.COVE_BASE_ISO }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          architecture: x64
+      - name: Package Cove
+        shell: pwsh
+        run: |
+          python -m pip install -r requirements.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed' }
+          ./scripts/Build-App.ps1
+      - name: Build ISO
+        shell: pwsh
+        run: |
+          if (!$env:COVE_BASE_ISO) { throw 'Set the COVE_BASE_ISO repository variable to the Windows ISO path on the runner.' }
+          $destination = Join-Path $env:RUNNER_TEMP "Cove-Windows11-x64-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT.iso"
+          ./scripts/Build-Iso.ps1 -BaseIso $env:COVE_BASE_ISO -OutputIso $destination
+          "ISO saved on runner: $destination" >> $env:GITHUB_STEP_SUMMARY
